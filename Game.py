@@ -3,6 +3,7 @@ import neat
 import os
 import time
 import random
+pygame.font.init()
 
 #window frame constants
 WIN_WIDTH = 560
@@ -14,6 +15,7 @@ PIPE_IMG = pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "pipe
 BASE_IMG = pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "base.png")))
 BG_IMG = pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "bg.png")))
 
+STAT_FONT = pygame.font.SysFont("arial",50)
 
 #creating the bird class
 class Bird:
@@ -163,11 +165,13 @@ class Base:
     
 
 
-def draw_window(win,bird,pipes,base):           #paremeters are the inputs the function requires
+def draw_window(win,bird,pipes,base,score):           #paremeters are the inputs the function requires
     win.blit(BG_IMG,(0,0))     #0,0 takes the bottom left corner of x, y            #blit is draw function requiring different paremeters, draws the bg img + location
     bird.draw(win)           #attaching the bird to window
     for pipe in pipes:
         pipe.draw(win)
+    text = STAT_FONT.render("Score: " + str(score), 1, (255,255,255))
+    win.blit(text, (WIN_WIDTH - 10 - text.get_width(),10))
     base.draw(win)
     
     pygame.display.update()     #updating frames
@@ -206,7 +210,7 @@ def main():
         if bird.y + bird.img.get_height()>= 730:
             pass
         base.move()
-        draw_window(window,bird,pipes,base)
+        draw_window(window,bird,pipes,base,score)
         
 
 if __name__ == "__main__":
