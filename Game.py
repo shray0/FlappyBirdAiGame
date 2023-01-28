@@ -211,7 +211,15 @@ def main():
             pass
         base.move()
         draw_window(window,bird,pipes,base,score)
+    pygame.quit()
+    quit()
+
+def run(config_path):
+    config = neat.config.Config(neat.DefaultGenome,neat.DefaultReproduction,neat.DefaultSpeciesSet,neat.DefaultStagnation,config_path)
         
 
 if __name__ == "__main__":
     main()
+    local_dir = os.path.dirname(__file__)
+    config_path = os.path.join(local_dir, "config_feedforward.txt") #data for neural network
+
