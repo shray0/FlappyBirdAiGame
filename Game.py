@@ -14,7 +14,7 @@ BIRD_IMGS = [pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "bi
 PIPE_IMG = pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "pipe.png")))
 BASE_IMG = pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "base.png")))
 BG_IMG = pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "bg.png")))
-
+GEN = 0
 STAT_FONT = pygame.font.SysFont("arial",50)
 
 #creating the bird class
@@ -23,6 +23,7 @@ class Bird:
     MAX_ROTATION = 25
     ROTATION_VELOCITY = 20
     ANIMATION_TIME = 5
+  
 
     #initiating variables in the class (sort of like the starting identity of the bird)
     def __init__(self, x, y): #the function __init__ whenever the class is called with paremeters it brings it directly to the init paramters
@@ -165,18 +166,23 @@ class Base:
     
 
 
-def draw_window(win,bird,pipes,base,score):           #paremeters are the inputs the function requires
+def draw_window(win,birds,pipes,base,score,gen):           #paremeters are the inputs the function requires
     win.blit(BG_IMG,(0,0))     #0,0 takes the bottom left corner of x, y            #blit is draw function requiring different paremeters, draws the bg img + location
-    bird.draw(win)           #attaching the bird to window
+    for bird in birds:
+        bird.draw(win)           #attaching the bird to window
     for pipe in pipes:
         pipe.draw(win)
     text = STAT_FONT.render("Score: " + str(score), 1, (255,255,255))
     win.blit(text, (WIN_WIDTH - 10 - text.get_width(),10))
+    text = STAT_FONT.render("Gen: " + str(gen), 1, (255,255,255))
+    win.blit(text, (10,10))
     base.draw(win)
     
     pygame.display.update()     #updating frames
 
 def main(genomes,config): 
+    global GEN 
+    GEN += 1
     networks = []
     genomes = []
     score = 0
@@ -186,8 +192,8 @@ def main(genomes,config):
     window = pygame.display.set_mode((WIN_WIDTH,WIN_HEIGHT))
     clock = pygame.time.Clock()
     run = True
-    for g in genomes:
-        network = neat.nn.FeedForwardNetwork(g,config)
+    for _,g in genomes:
+        network = neat.nn.FeedForwardNetwork.create(g,config)
         networks.append(network)
         birds.append(Bird(230,350))
         g.fitness = 0
@@ -197,13 +203,32 @@ def main(genomes,config):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
-        #bird.move()
+                pygame.quit()
+                quit()
+
+        pipe_index = 0
+        if len(birds) > 0:
+            if len(pipes) > 1 and birds[0].x > pipes[0].x + pipes[0].PIPE_TOP.get_width():
+                pipe_index = 1 #might be += 1
+        else: 
+            run = False #shuts down code
+            break #stops loop from running
+        for x,bird in enumerate(birds): #enumarate has one variable, in this case x keeping track of index, and bird keeping of value
+            bird.move()
+            genomes[x].fitness += 0.1  #for every frame it survives, it has higher fitness
+            output = networks[x].activate((bird.y,abs(bird.y - pipes[pipe_index].height),abs(bird.y - pipes[pipe_index].bottom))) #the movement output is the decision based on the neural network
+            if output[0] > 0.5: #comeback to absolute value part
+                bird.jump()
+
         remove = []
         add_pipe = False
         for pipe in pipes:
-            for bird in birds: 
+            for x,bird in enumerate(birds): 
                 if pipe.collide(bird,window):
-                    pass
+                    genomes[x].fitness -= 1 #makes the model of the bird that collides less fit to the ideal model
+                    birds.pop(x) #removes the collided bird from index
+                    networks.pop(x) #removes from network
+                    genomes.pop(x) #removes from generation of birds
                 if not pipe.passed and pipe.x < bird.x:
                     pipe.passed = True
                     add_pipe = True
@@ -213,27 +238,39 @@ def main(genomes,config):
             pipe.move()
         if add_pipe:
             score += 1
+            for genome in genomes:
+                genome.fitness += 5
             pipes.append(Pipe(600))
         for r in remove:
             pipes.remove(r)
-        for bird in birds:
-            if bird.y + bird.img.get_height()>= 730:
-                pass
+        for x,bird in enumerate(birds):
+            if bird.y + bird.img.get_height()>= 730 or bird.y < 0: #if it goes too high it is a bad model
+                birds.pop(x)
+                networks.pop(x)
+                genomes.pop(x)
+                
         base.move()
-        draw_window(window,bird,pipes,base,score)
-    pygame.quit()
-    quit()
+        draw_window(window,birds,pipes,base,score,GEN)
+    
 
 def run(config_path):
-    config = neat.config.Config(neat.DefaultGenome,neat.DefaultReproduction,neat.DefaultSpeciesSet,neat.DefaultStagnation,config_path)
-    population = neat.Population(config)
-    population.add_reporter(neat.StdOutReporter(True))
+    config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,neat.DefaultSpeciesSet, neat.DefaultStagnation,config_path)
+
+    # Create the population, which is the top-level object for a NEAT run.
+    p = neat.Population(config)
+
+    # Add a stdout reporter to show progress in the terminal.
+    p.add_reporter(neat.StdOutReporter(True))
     stats = neat.StatisticsReporter()
-    population.add_reporter(stats)
-    winner = population.run(main,50)        
+    p.add_reporter(stats)
+    #p.add_reporter(neat.Checkpointer(5))
+
+    # Run for up to 50 generations.
+    winner = p.run(main, 50)     
 
 if __name__ == "__main__":
-    main()
+    #main(,50)
     local_dir = os.path.dirname(__file__)
-    config_path = os.path.join(local_dir, "config_feedforward.txt") #data for neural network
+    config_path = os.path.join(local_dir, 'config_feedforward.txt') #data for neural network
+    run(config_path)
 
